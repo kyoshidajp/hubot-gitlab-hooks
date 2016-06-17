@@ -59,6 +59,13 @@ module.exports = (robot) ->
   trim_commit_url = (url) ->
     url.replace(/(\/[0-9a-f]{9})[0-9a-f]+$/, '$1')
 
+  replace_subdir_url = (param_url) ->
+    subdir = process.env.GITLAB_SUBDIR
+    return param_url unless subdir?
+    obj = url.parse(param_url)
+    obj.pathname = obj.pathname.replace(///^#{subdir}///, '')
+    url.format(obj)
+
   handler = (type, req, res) ->
     query = querystring.parse(url.parse(req.url).query)
     hook = req.body
@@ -134,7 +141,7 @@ module.exports = (robot) ->
             when "issue"
               unless hook.object_attributes.action == "update"
               # for now we don't trigger on update because on manual close it triggers close and update
-                text = "Issue #{bold(hook.object_attributes.iid)}: #{hook.object_attributes.title} (#{hook.object_attributes.action}) at #{hook.object_attributes.url}"
+                text = "Issue #{bold(hook.object_attributes.iid)}: #{hook.object_attributes.title} (#{hook.object_attributes.action}) at #{replace_subdir_url(hook.object_attributes.url)}"
                 if hook.object_attributes.description
                   # split describtion on \r\n so that It can add >> to every line
                   splitted = hook.object_attributes.description.split  "\r\n"
@@ -145,14 +152,14 @@ module.exports = (robot) ->
             when "merge_request"
               unless hook.object_attributes.action == "update"
                 if showMergeDesc == "1"  
-                  text = "Merge Request #{bold(hook.object_attributes.iid)}: #{hook.user.username} #{hook.object_attributes.action}  #{hook.object_attributes.title} between #{bold(hook.object_attributes.source_branch)} and #{bold(hook.object_attributes.target_branch)} at #{bold(hook.object_attributes.url)}\n"
+                  text = "Merge Request #{bold(hook.object_attributes.iid)}: #{hook.user.username} #{hook.object_attributes.action}  #{hook.object_attributes.title} between #{bold(hook.object_attributes.source_branch)} and #{bold(hook.object_attributes.target_branch)} at #{bold(replace_subdir_url(hook.object_attributes.url))}\n"
                   splitted = hook.object_attributes.description.split  "\r\n"
                   for i in [0...splitted.length]
                     splitted[i] = "> " + splitted[i]
                   text += "\r\n" + splitted.join "\r\n"
                   robot.send user, text
                 else
-                  robot.send user, "Merge Request #{bold(hook.object_attributes.iid)}: #{hook.user.username} #{hook.object_attributes.action}  #{hook.object_attributes.title} (#{hook.object_attributes.state}) between #{bold(hook.object_attributes.source_branch)} and #{bold(hook.object_attributes.target_branch)} at #{bold(hook.object_attributes.url)}"
+                  robot.send user, "Merge Request #{bold(hook.object_attributes.iid)}: #{hook.user.username} #{hook.object_attributes.action}  #{hook.object_attributes.title} (#{hook.object_attributes.state}) between #{bold(hook.object_attributes.source_branch)} and #{bold(hook.object_attributes.target_branch)} at #{bold(replace_subdir_url(hook.object_attributes.url))}"
 
   robot.router.post "/gitlab/system", (req, res) ->
     handler "system", req, res
